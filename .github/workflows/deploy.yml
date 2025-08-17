@@ -1,15 +1,16 @@
-name: Deploy to EC2
+name: Deploy Appointment API to EC2
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v3
 
       - name: Set up SSH
@@ -19,9 +20,29 @@ jobs:
 
       - name: Deploy to EC2
         run: |
+          echo "🔑 Connecting to EC2..."
           ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_HOST }} << 'EOF'
-          cd ~/app || git clone https://github.com/${{ github.repository }} app && cd app
+          
+          echo "📂 Checking app directory..."
+          if [ ! -d "~/app" ]; then
+            echo "➡️ Cloning fresh repo"
+            git clone https://github.com/${{ github.repository }} app
+          fi
+          cd app
+
+          echo "📥 Pulling latest code..."
+          git reset --hard
           git pull origin main
-          docker compose down
+
+          echo "🐳 Restarting Docker Compose..."
+          docker compose down || true
+          docker compose pull
           docker compose up -d --build
+
+          echo "✅ Containers running:"
+          docker ps -a
+
+          echo "📝 Last 50 lines of app logs:"
+          docker compose logs --tail=50
+
           EOF
