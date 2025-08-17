@@ -1,4 +1,4 @@
-name: Deploy to EC2
+name: Deploy Appointment API to EC2
 
 on:
   push:
@@ -10,44 +10,65 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 🔑 Connect to EC2 and Deploy
-        uses: appleboy/ssh-action@v0.1.10
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up SSH
+        uses: webfactory/ssh-agent@v0.8.0
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            echo "🚀 Starting deployment..."
+          ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
 
-            # Install Docker if missing
-            if ! command -v docker &> /dev/null
-            then
-              echo "🐳 Installing Docker..."
-              sudo apt-get update -y
-              sudo apt-get install -y docker.io docker-compose-plugin
-              sudo systemctl enable docker
-              sudo systemctl start docker
-            fi
+      - name: Deploy to EC2
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_HOST }} << 'EOF'
+          
+          echo "🚀 Starting deployment..."
 
-            echo "📂 Checking app directory..."
-            if [ ! -d "~/app" ]; then
-              echo "➡️ Cloning fresh repo"
-              git clone https://github.com/touseefiqbal845/Nodejs-AppointmentSys-DH-APIS app
-            fi
+          # Install Docker if missing
+          if ! command -v docker &> /dev/null
+          then
+            echo "🐳 Installing Docker..."
+            sudo apt-get update -y
+            sudo apt-get install -y ca-certificates curl gnupg lsb-release
 
-            cd app
+            sudo mkdir -p /etc/apt/keyrings
+            curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 
-            echo "📥 Pulling latest code..."
-            git reset --hard
-            git pull origin main
+            echo \
+              "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+              $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 
-            echo "🐳 Restarting Docker Compose..."
-            docker compose down || true
-            docker compose pull
-            docker compose up -d --build
+            sudo apt-get update -y
+            sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
-            echo "✅ Containers running:"
-            docker ps -a
+            sudo systemctl enable docker
+            sudo systemctl start docker
 
-            echo "📝 Last 50 lines of app logs:"
-            docker compose logs --tail=50
+            sudo usermod -aG docker $USER
+            newgrp docker
+          fi
+
+          echo "📂 Checking app directory..."
+          if [ ! -d "~/app" ]; then
+            echo "➡️ Cloning fresh repo"
+            git clone https://github.com/touseefiqbal845/Nodejs-AppointmentSys-DH-APIS app
+          fi
+
+          cd app
+
+          echo "📥 Pulling latest code..."
+          git reset --hard
+          git pull origin main
+
+          echo "🐳 Restarting Docker Compose..."
+          docker compose down || true
+          docker compose pull
+          docker compose up -d --build
+
+          echo "✅ Containers running:"
+          docker ps -a
+
+          echo "📝 Last 50 lines of app logs:"
+          docker compose logs --tail=50
+
+          EOF
