@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: mongodb
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+
+  app:
+    build: .
+    container_name: appointment-app
+    restart: always
+    ports:
+      - "5001:5001"
+    environment:
+      MONGO_DB_URL: mongodb://localhost:27017/doctorhunt
+      PORT: 5001
+      JWT_SECRET_KEY: PUNJABUNI321
+      SESSION_SECRET_KEY: SESSION_KEY
+      END_POINT: whsec_DFVIFC758MRfdUayDI36qhNnWUuEwOAY
+      DB_PASSWORD: Punjabuni321
+      MAIL_PASSWARD: whdm wpxa jrar zzvl
+    depends_on:
+      - mongodb
+
+volumes:
+  mongo-data:
